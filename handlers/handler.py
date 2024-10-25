@@ -1,5 +1,7 @@
 import re
+import os
 
+from dotenv import load_dotenv
 from aiogram import F, Router
 from aiogram.filters import BaseFilter
 from aiogram.filters.command import Command
@@ -8,30 +10,22 @@ from aiogram.utils.formatting import Bold, Text
 from aiogram.utils.media_group import MediaGroupBuilder
 from emoji import emojize
 
-from pars_api import parse
+from handlers.utils import generator_for_posts
 
-"""
-прописать состояние
-прописать фильтр на хэндлер
-оптимизировать код, потому что на хуйню похоже
-"""
-
+load_dotenv()
+access_users: list[int] = list(map(int, os.getenv("access_users").split(",")))
 
 router = Router()
 
 
-access_users: list[int] = [338735083]
-
-
 class IsAdmin(BaseFilter):
-    def __init__(self, admin_ids: list[int]):
-        self.admin_ids = admin_ids
+    def __init__(self, access_users: list[int]):
+        self.access_users = access_users
 
     async def __call__(self, message: Message) -> bool:
-        return message.from_user.id in self.admin_ids
+        return message.from_user.id in self.access_users
 
 
-# @router.message(lambda msg: msg.text in ("/start", "/help"))
 @router.message(Command(commands=["start"]))
 async def start_handler(message: Message):
     text = Text(
@@ -43,14 +37,9 @@ async def start_handler(message: Message):
 @router.message(IsAdmin(access_users), F.text)
 async def create_media_group(message: Message):
     articles = re.split(r"[.,\s;]+", message.text.strip())
-    all_item = [parse(i) for i in articles]  # можно тут проверку parse(i)
+    uniq_articles = list(dict.fromkeys(articles))
 
-    # это временное решение
-    all_item = [i for i in all_item if i is not None]
-
-    # попробовать заменить на генератор, просто поменять ()
-    group_art = [all_item[i : i + 9] for i in range(0, len(all_item), 9)]
-    for post in group_art:
+    for post in generator_for_posts(uniq_articles):
         if len(post) == 9:
             text = emojize(
                 f"""
